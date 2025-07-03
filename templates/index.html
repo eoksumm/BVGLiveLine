@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVG Live Line - Real-time U-Bahn Arrivals</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background-color: #000;
+            color: #FFCC00;
+            font-family: 'BVGFont', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            text-align: center;
+            min-height: 100vh;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: clamp(24px, 5vw, 38px);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        p {
+            font-size: 18px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .search-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            padding: 12px 15px;
+            font-size: 18px;
+            width: 100%;
+            max-width: 300px;
+            text-transform: uppercase;
+            border: 2px solid #FFCC00;
+            background-color: #000;
+            color: #FFCC00;
+            text-align: center;
+            font-family: inherit;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
+        }
+
+        input::placeholder {
+            color: #FFCC00;
+            opacity: 0.7;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 18px;
+            background-color: #FFCC00;
+            border: none;
+            color: #000;
+            cursor: pointer;
+            margin-left: 10px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #FFD700;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 52px;
+            background: #000;
+            color: #FFCC00;
+            border: 2px solid #FFCC00;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            text-align: left;
+            font-size: 16px;
+            display: none;
+            border-radius: 0 0 4px 4px;
+        }
+
+        #autocomplete-list div {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            transition: background-color 0.2s ease;
+        }
+
+        #autocomplete-list div:hover {
+            background: #222;
+        }
+
+        #autocomplete-list div:last-child {
+            border-bottom: none;
+        }
+
+        #results {
+            margin-top: 20px;
+            font-size: clamp(16px, 4vw, 24px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 900px;
+        }
+
+        .arrival-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(255, 204, 0, 0.1);
+            border-bottom: 2px solid #FFCC00;
+            font-size: clamp(18px, 3vw, 24px);
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .arrival-item:hover {
+            background: rgba(255, 204, 0, 0.2);
+            transform: translateX(5px);
+        }
+
+        .arrival-item:last-child {
+            border-bottom: 3px solid #FFCC00;
+        }
+
+        .line {
+            flex: 1;
+            text-align: left;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
+        .destination {
+            flex: 2;
+            text-align: center;
+            padding: 0 10px;
+        }
+
+        .time {
+            flex: 1;
+            text-align: right;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
+        .loading {
+            font-size: 22px;
+            color: #FFCC00;
+            margin-top: 30px;
+            letter-spacing: 2px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .error {
+            color: #FF6B6B;
+            font-size: 18px;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid #FF6B6B;
+            border-radius: 4px;
+        }
+
+        .no-results {
+            color: #FFCC00;
+            font-size: 18px;
+            margin-top: 20px;
+            opacity: 0.8;
+        }
+
+        footer {
+            padding: 20px 0;
+            font-size: 14px;
+            color: #FFCC00;
+            opacity: 0.7;
+            border-top: 1px solid #333;
+            margin-top: 20px;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .search-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            button {
+                margin-left: 0;
+                width: 100%;
+                max-width: 300px;
+            }
+
+            #autocomplete-list {
+                right: 0;
+            }
+
+            .arrival-item {
+                padding: 12px 15px;
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .line, .destination, .time {
+                text-align: center;
+                margin: 2px 0;
+            }
+        }
+
+        /* Accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            .loading {
+                animation: none;
+            }
+            
+            .arrival-item {
+                transition: none;
+            }
+            
+            button {
+                transition: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <h1>BVG LiveLine</h1>
+        <p>Real-time U-Bahn arrivals for Berlin</p>
+        
+        <div class="search-container">
+            <input type="text" 
+                   id="station-input" 
+                   placeholder="Enter station name..." 
+                   oninput="autocompleteStations()" 
+                   onkeypress="handleKeyPress(event)"
+                   autocomplete="off">
+            <button id="search-btn" onclick="fetchArrivals()">Search</button>
+            <div id="autocomplete-list"></div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+    
+    <footer>
+        <p>Made with ❤️ | Data from BVG API</p>
+    </footer>
+
+    <script>
+        // Handle Enter key press
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                fetchArrivals();
+            }
+        }
+
+        function fetchArrivals() {
+            const stationInput = document.getElementById("station-input");
+            const station = stationInput.value.trim();
+            
+            if (!station) {
+                showError("Please enter a station name");
+                return;
+            }
+
+            const resultsDiv = $("#results");
+            resultsDiv.html("<div class='loading'>🚇 Fetching live data...</div>");
+
+            $.ajax({
+                url: "/get_arrivals",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ station: station }),
+                timeout: 10000,
+                success: function(data) {
+                    resultsDiv.empty();
+
+                    if (!data || data.length === 0) {
+                        resultsDiv.html("<div class='no-results'>No arrivals found for this station.</div>");
+                        return;
+                    }
+
+                    if (data[0] === "No U-Bahn arrivals found") {
+                        resultsDiv.html("<div class='no-results'>No U-Bahn arrivals found at this time.</div>");
+                        return;
+                    }
+
+                    if (data[0] === "Service temporarily unavailable") {
+                        resultsDiv.html("<div class='error'>Service temporarily unavailable. Please try again later.</div>");
+                        return;
+                    }
+
+                    data.forEach(arrival => {
+                        const match = arrival.match(/🚆 (\w+) → (.*?) \((\d+) min\)/);
+                        if (match) {
+                            const line = match[1];
+                            const destination = match[2];
+                            const minutes = match[3];
+
+                            const arrivalElement = `
+                                <div class="arrival-item">
+                                    <span class="line">${line}</span>
+                                    <span class="destination">${destination}</span>
+                                    <span class="time">${minutes} min</span>
+                                </div>
+                            `;
+                            resultsDiv.append(arrivalElement);
+                        }
+                    });
+
+                    // Hide autocomplete after successful search
+                    $("#autocomplete-list").hide();
+                },
+                error: function(xhr) {
+                    let errorMessage = "Error fetching arrivals. Please try again.";
+                    
+                    if (xhr.status === 404) {
+                        errorMessage = "Station not found. Please check the spelling.";
+                    } else if (xhr.status === 500) {
+                        errorMessage = "Server error. Please try again later.";
+                    } else if (xhr.status === 0) {
+                        errorMessage = "Connection error. Please check your internet connection.";
+                    }
+                    
+                    resultsDiv.html(`<div class='error'>${errorMessage}</div>`);
+                }
+            });
+        }
+
+        function showError(message) {
+            $("#results").html(`<div class='error'>${message}</div>`);
+        }
+
+        function autocompleteStations() {
+            const query = document.getElementById("station-input").value.trim();
+            
+            if (query.length < 2) {
+                $("#autocomplete-list").hide();
+                return;
+            }
+
+            $.ajax({
+                url: "/autocomplete",
+                method: "GET",
+                data: { query: query },
+                success: function(data) {
+                    const autocompleteList = $("#autocomplete-list");
+                    autocompleteList.empty();
+                    
+                    if (data && data.length > 0) {
+                        data.forEach(station => {
+                            const suggestion = `<div onclick="selectStation('${station.replace(/'/g, "\\'")}')">${station}</div>`;
+                            autocompleteList.append(suggestion);
+                        });
+                        autocompleteList.show();
+                    } else {
+                        autocompleteList.hide();
+                    }
+                },
+                error: function() {
+                    $("#autocomplete-list").hide();
+                }
+            });
+        }
+
+        function selectStation(station) {
+            document.getElementById("station-input").value = station;
+            $("#autocomplete-list").hide();
+        }
+
+        // Hide autocomplete when clicking outside
+        document.addEventListener("click", function(event) {
+            if (!event.target.closest(".search-container")) {
+                $("#autocomplete-list").hide();
+            }
+        });
+
+        // Clear results when input is cleared
+        document.getElementById("station-input").addEventListener("input", function() {
+            if (this.value.trim() === "") {
+                $("#results").empty();
+            }
+        });
+    </script>
+</body>
+</html>
