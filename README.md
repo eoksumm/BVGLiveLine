@@ -1,7 +1,5 @@
 # BVG Live Line 🚇
 
-Real-time U-Bahn arrival information for Berlin. Simple, fast, and mobile-friendly.
-
 ![Demo](demo.png)
 
 ## Features
